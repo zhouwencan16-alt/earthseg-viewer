@@ -575,6 +575,26 @@
                 const defaultBaseTexture = './assets/earth/segmentation_preview_10800.png';
                 const closeupBaseTexture = './assets/earth/segmentation_preview_14400.png';
                 const regionBaseTexture = './assets/earth/segmentation_preview_21600.png';
+                const globeHeightTexture = './assets/earth/bathymetry_bw_composite_4k.jpg';
+                const globeEnvironmentTexture = './assets/earth/starfield.jpg';
+                const initialGlobeTexture = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512">
+                        <defs>
+                            <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#0c4fa8"/>
+                                <stop offset="55%" stop-color="#0a3f8a"/>
+                                <stop offset="100%" stop-color="#072c63"/>
+                            </linearGradient>
+                            <radialGradient id="glow" cx="50%" cy="42%" r="70%">
+                                <stop offset="0%" stop-color="rgba(255,255,255,0.22)"/>
+                                <stop offset="55%" stop-color="rgba(120,180,255,0.06)"/>
+                                <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                            </radialGradient>
+                        </defs>
+                        <rect width="1024" height="512" fill="url(#ocean)"/>
+                        <ellipse cx="512" cy="220" rx="360" ry="150" fill="url(#glow)"/>
+                    </svg>
+                `)}`;
                 const fallbackMapTexture = './assets/earth/segmentation_preview_mercator_10800.png';
                 const closeupDistanceThreshold = 85;
                 const mapZoomMidThreshold = 4.2;
@@ -593,7 +613,9 @@
                 };
 
                 const activeView = ref('globe');
-                const currentBaseTexture = ref(defaultBaseTexture);
+                const currentBaseTexture = ref(initialGlobeTexture);
+                const currentHeightTexture = ref(null);
+                const currentEnvironmentTexture = ref(null);
                 const isRotating = ref(true);
                 const isRegionMode = ref(false);
                 const activeRegionConfig = ref(null);
@@ -602,6 +624,8 @@
                 const legendItemsPerPage = 8;
                 const currentRegionName = ref(globalRegionName);
                 const currentStats = ref({ ...globalStats });
+                let globeAssetsReady = false;
+                let globeUpgradeScheduled = false;
 
                 const regions = ref([
                     {
@@ -987,10 +1011,69 @@
                     mapInstance.render();
                 };
 
+                const preloadImage = (src) => {
+                    return new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.decoding = 'async';
+                        img.onload = () => resolve(src);
+                        img.onerror = reject;
+                        img.src = src;
+                    });
+                };
+
+                const getPreferredBaseTexture = (distance) => {
+                    if (isRegionMode.value) {
+                        return regionBaseTexture;
+                    }
+                    return distance <= closeupDistanceThreshold ? closeupBaseTexture : defaultBaseTexture;
+                };
+
+                const applyUpgradedGlobeAssets = () => {
+                    globeUpgradeScheduled = false;
+                    if (globeAssetsReady) return;
+
+                    globeAssetsReady = true;
+                    currentHeightTexture.value = globeHeightTexture;
+                    currentEnvironmentTexture.value = globeEnvironmentTexture;
+
+                    const nextTexture = getPreferredBaseTexture(currentViewControl.distance);
+                    currentBaseTexture.value = nextTexture;
+
+                    if (myChart) {
+                        myChart.setOption({
+                            globe: {
+                                baseTexture: currentBaseTexture.value,
+                                heightTexture: currentHeightTexture.value,
+                                environment: currentEnvironmentTexture.value
+                            }
+                        });
+                    }
+                };
+
+                const ensureGlobeAssetsUpgraded = (immediate = false) => {
+                    if (globeAssetsReady) return;
+
+                    if (immediate) {
+                        applyUpgradedGlobeAssets();
+                        return;
+                    }
+
+                    if (globeUpgradeScheduled) return;
+                    globeUpgradeScheduled = true;
+
+                    const scheduleUpgrade = window.requestIdleCallback
+                        ? (callback) => window.requestIdleCallback(callback, { timeout: 1500 })
+                        : (callback) => window.setTimeout(callback, 450);
+
+                    scheduleUpgrade(() => {
+                        applyUpgradedGlobeAssets();
+                    });
+                };
+
                 const updateTextureForDistance = (distance) => {
-                    const nextTexture = isRegionMode.value
-                        ? regionBaseTexture
-                        : (distance <= closeupDistanceThreshold ? closeupBaseTexture : defaultBaseTexture);
+                    const nextTexture = globeAssetsReady
+                        ? getPreferredBaseTexture(distance)
+                        : initialGlobeTexture;
 
                     const globeTextureChanged = currentBaseTexture.value !== nextTexture;
 
@@ -999,7 +1082,9 @@
                     if (globeTextureChanged && myChart && activeView.value === 'globe') {
                         myChart.setOption({
                             globe: {
-                                baseTexture: currentBaseTexture.value
+                                baseTexture: currentBaseTexture.value,
+                                heightTexture: currentHeightTexture.value || undefined,
+                                environment: currentEnvironmentTexture.value || undefined
                             }
                         });
                     }
@@ -1049,7 +1134,10 @@
                         myChart.setOption({
                             globe: {
                                 baseTexture: currentBaseTexture.value,
-                                viewControl: globeViewControl
+                                heightTexture: currentHeightTexture.value || undefined,
+                                environment: currentEnvironmentTexture.value || undefined,
+                                viewControl: globeViewControl,
+                                layers: []
                             }
                         });
                     }
@@ -1074,8 +1162,8 @@
                         backgroundColor: '#000000',
                         globe: {
                             baseTexture: currentBaseTexture.value,
-                            heightTexture: './assets/earth/bathymetry_bw_composite_4k.jpg',
-                            environment: './assets/earth/starfield.jpg',
+                            heightTexture: currentHeightTexture.value || undefined,
+                            environment: currentEnvironmentTexture.value || undefined,
                             displacementScale: 0.015,
                             shading: 'lambert',
                             postEffect: {
@@ -1097,6 +1185,7 @@
                     });
 
                     applyViewMode();
+                    ensureGlobeAssetsUpgraded();
 
                     window.addEventListener('resize', () => {
                         if (myChart && activeView.value === 'globe') {
@@ -1240,6 +1329,7 @@
                     isRotating.value = false;
                     const [targetLng, targetLat] = getRegionCenter(region);
                     const nextGlobeDistance = region.globeDistance || region.distance || 42;
+                    ensureGlobeAssetsUpgraded(true);
                     currentViewControl = {
                         ...currentViewControl,
                         autoRotate: false,
