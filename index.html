@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EarthSeg 交互分析平台</title>
+    <link rel="icon" href="data:,">
+
+    <script src="./libs/vue.global.prod.js"></script>
+    <script src="./libs/echarts.min.js"></script>
+    <script src="./libs/echarts-gl.min.js"></script>
+    <link rel="stylesheet" href="./libs/package/ol.css">
+    <script src="./libs/package/dist/ol.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+        }
+
+        #earth-container,
+        #map-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #map-container {
+            display: none;
+            background: #02060d;
+        }
+
+        .ol-viewport {
+            background:
+                radial-gradient(circle at center, rgba(14, 165, 233, 0.08) 0%, rgba(2, 6, 13, 0) 38%),
+                linear-gradient(180deg, rgba(2, 6, 13, 0.92) 0%, rgba(2, 6, 13, 0.72) 100%);
+        }
+
+        .ol-control {
+            display: none !important;
+        }
+
+        .header {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            padding: 25px 40px;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.9) 0%, transparent 100%);
+            color: white;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 34px;
+            font-weight: 800;
+            background: -webkit-linear-gradient(#fff, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #10b981;
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+
+        .glass-panel {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            color: white;
+            z-index: 10;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .control-panel {
+            top: 120px;
+            left: 30px;
+            width: 280px;
+        }
+
+        .control-panel h3,
+        .right-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 10px;
+        }
+
+        .btn-region {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+        }
+
+        .btn-region:hover {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: #3b82f6;
+            transform: translateX(5px);
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .btn-action:hover {
+            background: #10b981;
+            color: white;
+        }
+
+        .view-toggle-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-toggle {
+            flex: 1;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-toggle:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: #3b82f6;
+        }
+
+        .btn-toggle.active {
+            background: rgba(59, 130, 246, 0.35);
+            border-color: #60a5fa;
+            color: #dbeafe;
+        }
+
+        .right-panel {
+            top: 120px;
+            right: 30px;
+            width: 320px;
+            max-height: calc(100vh - 150px);
+            overflow-y: auto;
+        }
+
+        .stat-group {
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 4px;
+            color: #cbd5e1;
+        }
+
+        .progress-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            transition: width 1s ease-in-out;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+        .legend-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .color-box {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin-right: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .legend-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-pager {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .legend-page-info {
+            flex: 1;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .btn-page {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-page:hover:not(:disabled) {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: #3b82f6;
+        }
+
+        .btn-page:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .ui-toggle-floating {
+            position: absolute;
+            top: 24px;
+            right: 30px;
+            z-index: 25;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+            transition: 0.3s;
+        }
+
+        .ui-toggle-floating:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: #3b82f6;
+        }
+
+        .toast {
+            position: absolute;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            z-index: 20;
+            background: rgba(239, 68, 68, 0.94);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+            max-width: 60vw;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="earth-container"></div>
+        <div id="map-container"></div>
+
+        <button class="ui-toggle-floating" @click="toggleUi">
+            {{ showUi ? '隐藏 UI' : '显示 UI' }}
+        </button>
+
+        <div class="header" v-show="showUi">
+            <h1>EarthSeg</h1>
+            <p>基于 AlphaEarth 先验的全球双模态遥感语义分割分析平台</p>
+        </div>
+
+        <div class="glass-panel control-panel" v-show="showUi">
+            <h3>全球典型验证区域导航</h3>
+            <p style="font-size: 12px; color: #94a3b8; margin-bottom: 15px;">
+                点击以下区域，调用 16m 双模态模型进行面向场景的解译。
+            </p>
+
+            <button
+                class="btn-region"
+                v-for="(region, index) in regions"
+                :key="index"
+                @click="flyToRegion(region)"
+            >
+                <span>{{ region.name }}</span>
+                <span style="color: #60a5fa; font-size: 12px;">探索</span>
+            </button>
+
+            <button class="btn-action" @click="toggleRotation">
+                {{ isRotating ? '暂停地球自转' : '恢复地球自转' }}
+            </button>
+
+            <button v-if="isRegionMode" class="btn-action" @click="returnToGlobalView">
+                返回全球视角
+            </button>
+
+            <div class="view-toggle-group">
+                <button
+                    class="btn-toggle"
+                    :class="{ active: activeView === 'globe' }"
+                    @click="switchView('globe')"
+                >
+                    地球视图
+                </button>
+                <button
+                    class="btn-toggle"
+                    :class="{ active: activeView === 'map' }"
+                    @click="switchView('map')"
+                >
+                    平面视图
+                </button>
+            </div>
+        </div>
+
+        <div class="glass-panel right-panel" v-show="showUi">
+            <h3>区域生态解译账本（当前: {{ currentRegionName }}）</h3>
+
+            <div class="stat-group">
+                <div class="stat-item">
+                    <div class="stat-label">
+                        <span>C: 植被碳汇潜能指数</span>
+                        <span>{{ currentStats.c.toFixed(2) }}</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-bar" style="background: #10b981;" :style="{ width: (currentStats.c * 100) + '%' }"></div>
+                    </div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">
+                        <span>W: 水资源储备调蓄指数</span>
+                        <span>{{ currentStats.w.toFixed(2) }}</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-bar" style="background: #3b82f6;" :style="{ width: (currentStats.w * 100) + '%' }"></div>
+                    </div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">
+                        <span>F: 农业粮食产能指数</span>
+                        <span>{{ currentStats.f.toFixed(2) }}</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-bar" style="background: #f59e0b;" :style="{ width: (currentStats.f * 100) + '%' }"></div>
+                    </div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">
+                        <span>P: 社会经济发展指数</span>
+                        <span>{{ currentStats.p.toFixed(2) }}</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-bar" style="background: #ef4444;" :style="{ width: (currentStats.p * 100) + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 22px;">区域解读</h3>
+            <p style="font-size: 12px; line-height: 1.75; color: #cbd5e1; margin: 0 0 18px 0;">
+                {{ currentNarrative }}
+            </p>
+
+            <h3 style="margin-top: 25px;">16m 细粒度调色盘图例</h3>
+
+            <div
+                class="legend-item"
+                v-for="item in pagedPalette"
+                :key="item.id"
+                @click="item.visible = !item.visible"
+            >
+                <div class="legend-left">
+                    <div class="color-box" :style="{ backgroundColor: `rgb(${item.rgb})`, opacity: item.visible ? 1 : 0.2 }"></div>
+                    <span :style="{ textDecoration: item.visible ? 'none' : 'line-through', color: item.visible ? '#fff' : '#64748b' }">
+                        {{ item.name }}
+                    </span>
+                </div>
+                <span style="font-size: 11px; color: #94a3b8;">{{ item.id }}</span>
+            </div>
+
+            <div class="legend-pager">
+                <button class="btn-page" @click="prevLegendPage" :disabled="legendPage === 0">上一页</button>
+                <div class="legend-page-info">{{ legendPage + 1 }} / {{ legendTotalPages }}</div>
+                <button class="btn-page" @click="nextLegendPage" :disabled="legendPage >= legendTotalPages - 1">下一页</button>
+            </div>
+        </div>
+
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script>
+        const { createApp, computed, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                let myChart = null;
+                let mapInstance = null;
+                let mapLayers = [];
+                let mapBaseLayers = [];
+                let mapRegionPreviewLayer = null;
+                let mapLayerCache = new Map();
+                let activeMapLayerKeys = new Set();
+                let mapTileDatasets = null;
+                let currentMapDatasetKey = '10800';
+                let syncTimer = null;
+                let mapVisibleMaxLat = 85.05112878;
+                const globalRegionName = '全球概览';
+                const globalStats = { c: 0.50, w: 0.40, f: 0.50, p: 0.50 };
+                const defaultGlobeViewControl = {
+                    autoRotate: true,
+                    autoRotateSpeed: 8,
+                    targetCoord: [100, 30],
+                    distance: 150,
+                    minDistance: 50,
+                    maxDistance: 300,
+                    alpha: 20,
+                    beta: 160
+                };
+                let currentViewControl = {
+                    ...defaultGlobeViewControl
+                };
+
+                const defaultBaseTexture = './assets/earth/segmentation_preview_10800.png';
+                const closeupBaseTexture = './assets/earth/segmentation_preview_14400.png';
+                const regionBaseTexture = './assets/earth/segmentation_preview_21600.png';
+                const fallbackMapTexture = './assets/earth/segmentation_preview_mercator_10800.png';
+                const closeupDistanceThreshold = 85;
+                const mapZoomMidThreshold = 4.2;
+                const mapZoomHighThreshold = 5.6;
+                const mapTileOverlapPixels = 1;
+                const mapImageExtent = ol.proj.transformExtent(
+                    [-180, -85.05112878, 180, 85.05112878],
+                    'EPSG:4326',
+                    'EPSG:3857'
+                );
+                const mapWorldWidth = mapImageExtent[2] - mapImageExtent[0];
+                const mapMinY = mapImageExtent[1];
+                const mapMaxY = mapImageExtent[3];
+                const getMapVisibleMaxY = () => {
+                    return ol.proj.transform([0, mapVisibleMaxLat], 'EPSG:4326', 'EPSG:3857')[1];
+                };
+
+                const activeView = ref('globe');
+                const currentBaseTexture = ref(defaultBaseTexture);
+                const isRotating = ref(true);
+                const isRegionMode = ref(false);
+                const activeRegionConfig = ref(null);
+                const showUi = ref(true);
+                const legendPage = ref(0);
+                const legendItemsPerPage = 8;
+                const currentRegionName = ref(globalRegionName);
+                const currentStats = ref({ ...globalStats });
+
+                const regions = ref([
+                    {
+                        name: '亚洲（长江中下游平原）',
+                        lng: 117.5,
+                        lat: 30.0,
+                        distance: 30,
+                        globeDistance: 24,
+                        mapZoom: 7.0,
+                        previewImage: './assets/regions/yangtze_plain/yangtze_plain_preview.png?v=20260405',
+                        previewBounds: [110, 25, 125, 35],
+                        stats: { c: 0.4059, w: 0.2217, f: 0.7551, p: 0.9000 }
+                    },
+                    {
+                        name: '欧洲（阿尔卑斯山脉）',
+                        lng: 12.5,
+                        lat: 45.0,
+                        distance: 32,
+                        globeDistance: 26,
+                        mapZoom: 6.8,
+                        previewImage: './assets/regions/alps/alps_preview.png?v=20260405',
+                        previewBounds: [5, 40, 20, 50],
+                        stats: { c: 0.4184, w: 0.1773, f: 0.5084, p: 0.5287 }
+                    },
+                    {
+                        name: '非洲（撒哈拉沙漠）',
+                        lng: 22.5,
+                        lat: 25.0,
+                        distance: 36,
+                        globeDistance: 28,
+                        mapZoom: 6.2,
+                        previewImage: './assets/regions/sahara/sahara_preview.png?v=20260405',
+                        previewBounds: [15, 20, 30, 30],
+                        stats: { c: 0.1000, w: 0.1000, f: 0.1000, p: 0.1000 }
+                    },
+                    {
+                        name: '北美洲（五大湖）',
+                        lng: -82.5,
+                        lat: 45.0,
+                        distance: 32,
+                        globeDistance: 26,
+                        mapZoom: 6.8,
+                        previewImage: './assets/regions/great_lakes/great_lakes_preview.png?v=20260405',
+                        previewBounds: [-90, 40, -75, 50],
+                        stats: { c: 0.6473, w: 0.9000, f: 0.9000, p: 0.4044 }
+                    },
+                    {
+                        name: '南美洲（亚马逊雨林）',
+                        lng: -60.0,
+                        lat: -5.0,
+                        distance: 34,
+                        globeDistance: 27,
+                        mapZoom: 6.3,
+                        previewImage: './assets/regions/amazon/amazon_preview.png?v=20260405',
+                        previewBounds: [-70, -10, -50, 0],
+                        stats: { c: 0.9000, w: 0.3663, f: 0.8217, p: 0.1635 }
+                    },
+                    {
+                        name: '大洋洲（澳洲东海岸）',
+                        lng: 147.5,
+                        lat: -32.5,
+                        distance: 34,
+                        globeDistance: 27,
+                        mapZoom: 6.2,
+                        previewImage: './assets/regions/east_au/east_au_preview.png?v=20260405',
+                        previewBounds: [140, -40, 155, -25],
+                        stats: { c: 0.3455, w: 0.1490, f: 0.4662, p: 0.5428 }
+                    }
+                ]);
+
+                const palette = ref([
+                    { id: 0, name: '草本雨养耕地', rgb: '240, 150, 255', visible: true },
+                    { id: 1, name: '乔木或灌木覆盖的雨养耕地', rgb: '255, 255, 99', visible: true },
+                    { id: 2, name: '灌溉耕地', rgb: '170, 240, 240', visible: true },
+                    { id: 3, name: '常绿阔叶林', rgb: '0, 100, 0', visible: true },
+                    { id: 4, name: '落叶阔叶林', rgb: '0, 160, 0', visible: true },
+                    { id: 5, name: '常绿针叶林', rgb: '0, 60, 0', visible: true },
+                    { id: 6, name: '落叶针叶林', rgb: '40, 80, 0', visible: true },
+                    { id: 7, name: '混交林', rgb: '120, 130, 0', visible: true },
+                    { id: 8, name: '常绿灌木林', rgb: '150, 75, 0', visible: true },
+                    { id: 9, name: '落叶灌木林', rgb: '150, 100, 0', visible: true },
+                    { id: 10, name: '草地', rgb: '255, 180, 50', visible: true },
+                    { id: 11, name: '地衣和苔藓', rgb: '255, 220, 210', visible: true },
+                    { id: 12, name: '稀疏植被', rgb: '255, 235, 175', visible: true },
+                    { id: 13, name: '沼泽', rgb: '0, 168, 132', visible: true },
+                    { id: 14, name: '草本湿地', rgb: '0, 224, 240', visible: true },
+                    { id: 15, name: '湖泊/河流滩地', rgb: '96, 112, 192', visible: true },
+                    { id: 16, name: '盐碱地', rgb: '130, 130, 130', visible: true },
+                    { id: 17, name: '红树林', rgb: '255, 0, 255', visible: true },
+                    { id: 18, name: '盐沼', rgb: '102, 205, 171', visible: true },
+                    { id: 19, name: '潮滩', rgb: '68, 79, 137', visible: true },
+                    { id: 20, name: '不透水表面', rgb: '195, 20, 0', visible: true },
+                    { id: 21, name: '裸地', rgb: '255, 245, 215', visible: true },
+                    { id: 22, name: '水体', rgb: '0, 70, 200', visible: true },
+                    { id: 23, name: '永久冰雪', rgb: '255, 255, 255', visible: true }
+                ]);
+
+                const legendTotalPages = computed(() => {
+                    return Math.max(1, Math.ceil(palette.value.length / legendItemsPerPage));
+                });
+
+                const pagedPalette = computed(() => {
+                    const start = legendPage.value * legendItemsPerPage;
+                    return palette.value.slice(start, start + legendItemsPerPage);
+                });
+
+                const regionNarratives = {
+                    '全球概览': '当前为全球概览视角。四维指标用于提供整体生态结构的基准参考，不代表单一地区的主导优势。切换到特定区域后，可结合碳汇、水资源、农业与社会经济四项指标理解其生态功能结构。',
+                    '亚洲（长江中下游平原）': '该区域农业粮食产能指数和社会经济发展指数均处于高位，说明耕地基础与人类活动强度都较强，适合强调粮食生产、城市群协同和高密度人地关系管理。碳汇与水资源调蓄能力相对不是主导优势，更适合走农业生产与综合开发并重的路径。',
+                    '欧洲（阿尔卑斯山脉）': '该区域四维结构较为均衡，社会经济发展和农业潜能处于中等偏上水平，同时保有一定碳汇能力。整体更适合突出山地生态保护、旅游与人类活动协同，而不宜简单理解为单一农业或单一生态保护主导区。',
+                    '非洲（撒哈拉沙漠）': '该区域四项指数整体偏低，说明碳汇、水资源、农业和社会经济支撑能力都受到显著约束，区域生态与开发潜力整体有限。展示上更适合突出生态脆弱性、资源稀缺性与环境约束，而不适合强调高强度农业或城市扩张。',
+                    '北美洲（五大湖）': '该区域水资源储备调蓄指数和农业粮食产能指数都较高，说明其兼具大尺度淡水资源优势与较强农业支撑能力。整体适合强调水安全、农业生产和区域开发协同，是典型的资源基础较强型区域。',
+                    '南美洲（亚马逊雨林）': '该区域植被碳汇潜能指数显著最高，说明森林生态系统主导特征非常明确，全球生态调节价值突出。农业潜能也具备一定基础，但社会经济开发指数较低，整体更适合突出生态保护、森林碳汇与气候调节功能，而非高强度开发。',
+                    '大洋洲（澳洲东海岸）': '该区域社会经济发展指数相对较高，农业产能处于中等水平，说明沿海开发和人类活动较为集中，同时仍保留一定生态支撑能力。整体适合强调沿海开发、人地协同与生态约束并存的复合格局。'
+                };
+
+                const currentNarrative = computed(() => {
+                    return regionNarratives[currentRegionName.value] || regionNarratives[globalRegionName];
+                });
+
+                const showToast = (msg) => {
+                    const toast = document.getElementById('toast');
+                    if (!toast) return;
+                    toast.innerText = msg;
+                    toast.style.display = 'block';
+                    window.setTimeout(() => {
+                        toast.style.display = 'none';
+                    }, 4000);
+                };
+
+                const getCurrentViewControl = () => {
+                    if (!myChart) return null;
+                    const option = myChart.getOption();
+                    const globeOption = Array.isArray(option.globe) ? option.globe[0] : option.globe;
+                    return globeOption && globeOption.viewControl ? globeOption.viewControl : null;
+                };
+
+                const getMapDatasetKeyForZoom = (zoom) => {
+                    if (zoom >= mapZoomHighThreshold) return '21600';
+                    if (zoom >= mapZoomMidThreshold) return '14400';
+                    return '10800';
+                };
+
+                const getRegionCenter = (region) => {
+                    if (region?.previewBounds?.length === 4) {
+                        const [west, south, east, north] = region.previewBounds;
+                        return [(west + east) / 2, (south + north) / 2];
+                    }
+                    return [region.lng, region.lat];
+                };
+
+                const focusMapOnRegion = (region, duration = 0) => {
+                    if (!mapInstance || !region) return;
+                    const [lng, lat] = getRegionCenter(region);
+                    const view = mapInstance.getView();
+                    if (duration > 0) {
+                        view.animate({
+                            center: ol.proj.fromLonLat([lng, lat]),
+                            zoom: region.mapZoom || 6.8,
+                            duration
+                        });
+                        return;
+                    }
+                    view.setCenter(ol.proj.fromLonLat([lng, lat]));
+                    view.setZoom(region.mapZoom || 6.8);
+                };
+
+                const wrapMapCenter = () => {
+                    if (!mapInstance) return;
+                    const view = mapInstance.getView();
+                    const center = view.getCenter();
+                    const size = mapInstance.getSize();
+                    if (!center || !size) return;
+
+                    let nextX = center[0];
+                    let nextY = center[1];
+                    let changed = false;
+
+                    if (nextX < mapImageExtent[0] || nextX > mapImageExtent[2]) {
+                        nextX = ((((nextX - mapImageExtent[0]) % mapWorldWidth) + mapWorldWidth) % mapWorldWidth) + mapImageExtent[0];
+                        changed = true;
+                    }
+
+                    const extent = view.calculateExtent(size);
+                    const visibleMaxY = getMapVisibleMaxY();
+
+                    if (extent[1] < mapMinY) {
+                        nextY += mapMinY - extent[1];
+                        changed = true;
+                    }
+
+                    if (extent[3] > visibleMaxY) {
+                        nextY -= extent[3] - visibleMaxY;
+                        changed = true;
+                    }
+
+                    if (changed) {
+                        view.setCenter([nextX, nextY]);
+                    }
+                };
+
+                const loadMapTileDatasets = async () => {
+                    if (mapTileDatasets) return mapTileDatasets;
+
+                    const [farResponse, nearResponse, highResponse] = await Promise.all([
+                        fetch('./segment-preview-metadata-10800.json'),
+                        fetch('./segment-preview-metadata-14400.json'),
+                        fetch('./segment-preview-metadata-21600.json')
+                    ]);
+
+                    mapTileDatasets = {
+                        '10800': await farResponse.json(),
+                        '14400': await nearResponse.json(),
+                        '21600': await highResponse.json()
+                    };
+
+                    mapVisibleMaxLat = Math.max(
+                        ...Object.values(mapTileDatasets).flatMap((dataset) =>
+                            (dataset.tiles || []).map((tile) => tile.north)
+                        )
+                    );
+
+                    return mapTileDatasets;
+                };
+
+                const createMapTileLayer = (tile, worldOffset) => {
+                    const shiftedExtent = ol.proj.transformExtent(
+                        [
+                            tile.west + worldOffset * 360,
+                            tile.south,
+                            tile.east + worldOffset * 360,
+                            tile.north
+                        ],
+                        'EPSG:4326',
+                        'EPSG:3857'
+                    );
+                    const overlapX = ((shiftedExtent[2] - shiftedExtent[0]) / tile.previewWidth) * mapTileOverlapPixels;
+                    const overlapY = ((shiftedExtent[3] - shiftedExtent[1]) / tile.previewHeight) * mapTileOverlapPixels;
+                    const expandedExtent = [
+                        shiftedExtent[0] - overlapX,
+                        shiftedExtent[1] - overlapY,
+                        shiftedExtent[2] + overlapX,
+                        shiftedExtent[3] + overlapY
+                    ];
+
+                    return new ol.layer.Image({
+                        source: new ol.source.ImageStatic({
+                            url: `./${tile.previewPath}`,
+                            projection: 'EPSG:3857',
+                            imageExtent: expandedExtent
+                        })
+                    });
+                };
+
+                const createFallbackMapLayer = (worldOffset) => {
+                    const shiftedExtent = [
+                        mapImageExtent[0] + worldOffset * mapWorldWidth,
+                        mapImageExtent[1],
+                        mapImageExtent[2] + worldOffset * mapWorldWidth,
+                        mapImageExtent[3]
+                    ];
+
+                    return new ol.layer.Image({
+                        source: new ol.source.ImageStatic({
+                            url: fallbackMapTexture,
+                            projection: 'EPSG:3857',
+                            imageExtent: shiftedExtent
+                        }),
+                        extent: [
+                            shiftedExtent[0],
+                            shiftedExtent[1],
+                            shiftedExtent[2],
+                            getMapVisibleMaxY()
+                        ],
+                        opacity: 1
+                    });
+                };
+
+                const createRegionPreviewLayer = (region) => {
+                    if (!region || !region.previewImage || !region.previewBounds) return null;
+                    const extent3857 = ol.proj.transformExtent(region.previewBounds, 'EPSG:4326', 'EPSG:3857');
+                    return new ol.layer.Image({
+                        source: new ol.source.ImageStatic({
+                            url: region.previewImage,
+                            projection: 'EPSG:3857',
+                            imageExtent: extent3857
+                        }),
+                        zIndex: 30,
+                        opacity: 1
+                    });
+                };
+
+                const updateRegionPreviewLayer = () => {
+                    if (!mapInstance) return;
+                    const layers = mapInstance.getLayers();
+
+                    if (mapRegionPreviewLayer) {
+                        layers.remove(mapRegionPreviewLayer);
+                        mapRegionPreviewLayer = null;
+                    }
+
+                    if (!isRegionMode.value || !activeRegionConfig.value?.previewImage) {
+                        return;
+                    }
+
+                    mapRegionPreviewLayer = createRegionPreviewLayer(activeRegionConfig.value);
+                    if (mapRegionPreviewLayer) {
+                        layers.push(mapRegionPreviewLayer);
+                    }
+                };
+
+                const getMapTileLayerKey = (tile, worldOffset) => {
+                    return `${currentMapDatasetKey}:${tile.name}:${worldOffset}`;
+                };
+
+                const updateMapTileLayers = async () => {
+                    if (!mapInstance) return;
+
+                    const datasets = await loadMapTileDatasets();
+                    const dataset = datasets[currentMapDatasetKey];
+                    if (!dataset || !dataset.tiles) return;
+
+                    const view = mapInstance.getView();
+                    const size = mapInstance.getSize();
+                    if (!size) return;
+
+                    const extent3857 = view.calculateExtent(size);
+                    const extent4326 = ol.proj.transformExtent(extent3857, 'EPSG:3857', 'EPSG:4326');
+                    const [westBound, southBound, eastBound, northBound] = extent4326;
+
+                    const worldRanges = [];
+                    for (let worldOffset = -1; worldOffset <= 1; worldOffset += 1) {
+                        const shiftedWest = westBound - worldOffset * 360;
+                        const shiftedEast = eastBound - worldOffset * 360;
+                        worldRanges.push({
+                            worldOffset,
+                            west: shiftedWest,
+                            east: shiftedEast
+                        });
+                    }
+
+                    const nextVisibleKeys = new Set();
+                    const nextVisibleLayers = [];
+                    for (const tile of dataset.tiles) {
+                        if (tile.north < southBound || tile.south > northBound) {
+                            continue;
+                        }
+
+                        for (const range of worldRanges) {
+                            if (tile.east < range.west || tile.west > range.east) {
+                                continue;
+                            }
+
+                            const layerKey = getMapTileLayerKey(tile, range.worldOffset);
+                            nextVisibleKeys.add(layerKey);
+
+                            if (!mapLayerCache.has(layerKey)) {
+                                mapLayerCache.set(layerKey, createMapTileLayer(tile, range.worldOffset));
+                            }
+
+                            nextVisibleLayers.push(mapLayerCache.get(layerKey));
+                        }
+                    }
+
+                    const layers = mapInstance.getLayers();
+                    for (const oldKey of activeMapLayerKeys) {
+                        if (!nextVisibleKeys.has(oldKey)) {
+                            const oldLayer = mapLayerCache.get(oldKey);
+                            if (oldLayer) {
+                                layers.remove(oldLayer);
+                            }
+                        }
+                    }
+
+                    nextVisibleLayers.forEach((layer) => {
+                        if (layers.getArray().indexOf(layer) === -1) {
+                            layers.push(layer);
+                        }
+                    });
+
+                    mapLayers = nextVisibleLayers;
+                    activeMapLayerKeys = nextVisibleKeys;
+                    mapInstance.render();
+                };
+
+                const updateTextureForDistance = (distance) => {
+                    const nextTexture = isRegionMode.value
+                        ? regionBaseTexture
+                        : (distance <= closeupDistanceThreshold ? closeupBaseTexture : defaultBaseTexture);
+
+                    const globeTextureChanged = currentBaseTexture.value !== nextTexture;
+
+                    currentBaseTexture.value = nextTexture;
+
+                    if (globeTextureChanged && myChart && activeView.value === 'globe') {
+                        myChart.setOption({
+                            globe: {
+                                baseTexture: currentBaseTexture.value
+                            }
+                        });
+                    }
+                };
+
+                const syncMapDatasetForZoom = (zoom) => {
+                    const nextMapDatasetKey = getMapDatasetKeyForZoom(zoom);
+                    if (currentMapDatasetKey === nextMapDatasetKey) {
+                        return;
+                    }
+
+                    currentMapDatasetKey = nextMapDatasetKey;
+                    if (mapInstance) {
+                        updateMapTileLayers();
+                    }
+                };
+
+                const setMapInteractionsLocked = (locked) => {
+                    if (!mapInstance) return;
+                    mapInstance.getInteractions().forEach((interaction) => {
+                        interaction.setActive(!locked);
+                    });
+                };
+
+                const applyViewMode = () => {
+                    if (myChart) {
+                        const globeViewControl = isRegionMode.value
+                            ? {
+                                ...currentViewControl,
+                                autoRotate: false,
+                                minDistance: currentViewControl.distance,
+                                maxDistance: currentViewControl.distance,
+                                rotateSensitivity: 0,
+                                zoomSensitivity: 0,
+                                panSensitivity: 0
+                            }
+                            : {
+                                ...currentViewControl,
+                                autoRotate: isRotating.value,
+                                minDistance: defaultGlobeViewControl.minDistance,
+                                maxDistance: defaultGlobeViewControl.maxDistance,
+                                rotateSensitivity: 1,
+                                zoomSensitivity: 1,
+                                panSensitivity: 1
+                            };
+
+                        myChart.setOption({
+                            globe: {
+                                baseTexture: currentBaseTexture.value,
+                                viewControl: globeViewControl
+                            }
+                        });
+                    }
+
+                    setMapInteractionsLocked(isRegionMode.value);
+                };
+
+                const initEarth = () => {
+                    const chartDom = document.getElementById('earth-container');
+                    if (!chartDom) {
+                        showToast('未找到地球容器 #earth-container');
+                        return;
+                    }
+                    if (typeof echarts === 'undefined') {
+                        showToast('echarts 加载失败，请检查 ./libs 目录');
+                        return;
+                    }
+
+                    myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        backgroundColor: '#000000',
+                        globe: {
+                            baseTexture: currentBaseTexture.value,
+                            heightTexture: './assets/earth/bathymetry_bw_composite_4k.jpg',
+                            environment: './assets/earth/starfield.jpg',
+                            displacementScale: 0.015,
+                            shading: 'lambert',
+                            postEffect: {
+                                enable: false
+                            },
+                            light: {
+                                main: {
+                                    intensity: 0.05,
+                                    shadow: false,
+                                    alpha: 35,
+                                    beta: 210
+                                },
+                                ambient: {
+                                    intensity: 1
+                                }
+                            },
+                            viewControl: currentViewControl
+                        }
+                    });
+
+                    applyViewMode();
+
+                    window.addEventListener('resize', () => {
+                        if (myChart && activeView.value === 'globe') {
+                            myChart.resize();
+                        }
+                        if (mapInstance && activeView.value === 'map') {
+                            mapInstance.updateSize();
+                        }
+                    });
+
+                    syncTimer = window.setInterval(() => {
+                        if (activeView.value !== 'globe') return;
+                        const latestViewControl = getCurrentViewControl();
+                        if (!latestViewControl) return;
+                        currentViewControl = {
+                            ...currentViewControl,
+                            ...latestViewControl
+                        };
+                        updateTextureForDistance(currentViewControl.distance);
+                    }, 400);
+                };
+
+                const initMap = async () => {
+                    const mapTarget = document.getElementById('map-container');
+                    if (!mapTarget) {
+                        showToast('未找到平面地图容器 #map-container');
+                        return;
+                    }
+                    if (typeof ol === 'undefined') {
+                        showToast('OpenLayers 加载失败，请检查 ./libs/package');
+                        return;
+                    }
+
+                    await loadMapTileDatasets();
+
+                    mapInstance = new ol.Map({
+                        target: mapTarget,
+                        controls: [],
+                        layers: [],
+                        view: new ol.View({
+                            projection: 'EPSG:3857',
+                            center: ol.proj.fromLonLat([100, 20]),
+                            zoom: 1.8,
+                            minZoom: 1,
+                            maxZoom: 8.5,
+                            constrainResolution: false
+                        })
+                    });
+
+                    if (isRegionMode.value && activeRegionConfig.value) {
+                        focusMapOnRegion(activeRegionConfig.value, 0);
+                    }
+
+                    setMapInteractionsLocked(isRegionMode.value);
+
+                    mapBaseLayers = [-1, 0, 1].map((worldOffset) => createFallbackMapLayer(worldOffset));
+                    const layers = mapInstance.getLayers();
+                    mapBaseLayers.forEach((layer) => layers.push(layer));
+                    updateRegionPreviewLayer();
+
+                    mapInstance.on('moveend', () => {
+                        wrapMapCenter();
+                        if (activeView.value !== 'map') return;
+                        const zoom = mapInstance.getView().getZoom() || 1;
+                        updateTextureForDistance(zoom >= mapZoomMidThreshold ? 60 : 150);
+                        syncMapDatasetForZoom(zoom);
+                        updateMapTileLayers();
+                    });
+
+                    await updateMapTileLayers();
+                };
+
+                const switchView = (view) => {
+                    activeView.value = view;
+                    const earth = document.getElementById('earth-container');
+                    const map = document.getElementById('map-container');
+                    if (!earth || !map) return;
+
+                    if (view === 'globe') {
+                        earth.style.display = 'block';
+                        map.style.display = 'none';
+                        if (myChart) {
+                            myChart.resize();
+                            applyViewMode();
+                        }
+                        return;
+                    }
+
+                    earth.style.display = 'none';
+                    map.style.display = 'block';
+                    if (!mapInstance) {
+                        initMap();
+                    }
+                    if (mapInstance) {
+                        mapInstance.updateSize();
+                        setMapInteractionsLocked(isRegionMode.value);
+                        if (isRegionMode.value && activeRegionConfig.value) {
+                            focusMapOnRegion(activeRegionConfig.value, 0);
+                        }
+                        updateRegionPreviewLayer();
+                        const zoom = mapInstance.getView().getZoom() || 1;
+                        syncMapDatasetForZoom(zoom);
+                        updateMapTileLayers();
+                    }
+                };
+
+                const toggleRotation = () => {
+                    if (isRegionMode.value) return;
+                    isRotating.value = !isRotating.value;
+                    if (!myChart || activeView.value !== 'globe') return;
+                    myChart.setOption({
+                        globe: {
+                            viewControl: {
+                                autoRotate: isRotating.value
+                            }
+                        }
+                    });
+                };
+
+                const toggleUi = () => {
+                    showUi.value = !showUi.value;
+                };
+
+                const prevLegendPage = () => {
+                    if (legendPage.value > 0) {
+                        legendPage.value -= 1;
+                    }
+                };
+
+                const nextLegendPage = () => {
+                    if (legendPage.value < legendTotalPages.value - 1) {
+                        legendPage.value += 1;
+                    }
+                };
+
+                const flyToRegion = (region) => {
+                    isRegionMode.value = true;
+                    activeRegionConfig.value = region;
+                    currentRegionName.value = region.name;
+                    currentStats.value = region.stats;
+                    isRotating.value = false;
+                    const [targetLng, targetLat] = getRegionCenter(region);
+                    const nextGlobeDistance = region.globeDistance || region.distance || 42;
+                    currentViewControl = {
+                        ...currentViewControl,
+                        autoRotate: false,
+                        targetCoord: [targetLng, targetLat],
+                        distance: nextGlobeDistance,
+                        animationDurationUpdate: 1800,
+                        animationEasingUpdate: 'cubicInOut'
+                    };
+                    updateTextureForDistance(currentViewControl.distance);
+
+                    if (activeView.value === 'map') {
+                        if (!mapInstance) return;
+                        setMapInteractionsLocked(true);
+                        updateRegionPreviewLayer();
+                        focusMapOnRegion(region, 1400);
+                        return;
+                    }
+
+                    if (!myChart) return;
+                    applyViewMode();
+                };
+
+                const returnToGlobalView = () => {
+                    isRegionMode.value = false;
+                    activeRegionConfig.value = null;
+                    currentRegionName.value = globalRegionName;
+                    currentStats.value = { ...globalStats };
+                    isRotating.value = true;
+                    currentViewControl = {
+                        ...defaultGlobeViewControl,
+                        animationDurationUpdate: 1400,
+                        animationEasingUpdate: 'cubicInOut'
+                    };
+                    updateTextureForDistance(currentViewControl.distance);
+
+                    if (activeView.value === 'map') {
+                        if (!mapInstance) return;
+                        setMapInteractionsLocked(false);
+                        updateRegionPreviewLayer();
+                        mapInstance.getView().animate({
+                            center: ol.proj.fromLonLat([100, 20]),
+                            zoom: 1.8,
+                            duration: 1400
+                        });
+                        return;
+                    }
+
+                    applyViewMode();
+                };
+
+                onMounted(() => {
+                    initEarth();
+                });
+
+                return {
+                    activeView,
+                    currentRegionName,
+                    currentNarrative,
+                    currentStats,
+                    flyToRegion,
+                    isRotating,
+                    isRegionMode,
+                    legendPage,
+                    legendTotalPages,
+                    palette,
+                    pagedPalette,
+                    prevLegendPage,
+                    nextLegendPage,
+                    regions,
+                    returnToGlobalView,
+                    showUi,
+                    switchView,
+                    toggleRotation,
+                    toggleUi
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
