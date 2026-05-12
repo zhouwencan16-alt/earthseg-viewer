@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EarthSeg 交互分析平台</title>
-    <link rel="icon" href="data:,">
+    <title>EarthSeg 全球遥感地物分析平台</title>
+    <link rel="icon" href="data:,\">
 
     <script src="./libs/vue.global.prod.js"></script>
     <script src="./libs/echarts.min.js"></script>
@@ -13,12 +13,15 @@
     <script src="./libs/package/dist/ol.js"></script>
 
     <style>
+        /* --- 全局科技感基础配置 --- */
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #000;
-            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #020913;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            color: #d8f0ff;
+            user-select: none;
         }
 
         #earth-container,
@@ -38,173 +41,294 @@
 
         .ol-viewport {
             background:
-                radial-gradient(circle at center, rgba(14, 165, 233, 0.08) 0%, rgba(2, 6, 13, 0) 38%),
-                linear-gradient(180deg, rgba(2, 6, 13, 0.92) 0%, rgba(2, 6, 13, 0.72) 100%);
+                radial-gradient(circle at center, rgba(0, 229, 255, 0.05) 0%, rgba(2, 6, 13, 0) 45%),
+                linear-gradient(180deg, rgba(2, 9, 18, 0.95) 0%, rgba(1, 4, 8, 0.85) 100%);
         }
 
         .ol-control {
             display: none !important;
         }
 
+        /* --- 仿大屏中央沉浸式梯形 Header --- */
         .header {
             position: absolute;
             top: 0;
+            left: 0;
             width: 100%;
-            padding: 25px 40px;
-            background: linear-gradient(180deg, rgba(0, 0, 0, 0.9) 0%, transparent 100%);
-            color: white;
+            height: 90px;
             pointer-events: none;
-            z-index: 10;
+            z-index: 15;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: 
+                linear-gradient(180deg, rgba(0, 20, 35, 0.9) 0%, rgba(0, 20, 35, 0.4) 60%, transparent 100%);
+            border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            width: 40%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00e5ff, #00ffaa, #00e5ff, transparent);
+            box-shadow: 0 0 10px #00e5ff;
+        }
+
+        .header-title-box {
+            margin-top: 15px;
+            padding: 0 50px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .header h1 {
             margin: 0;
-            font-size: 34px;
-            font-weight: 800;
-            background: -webkit-linear-gradient(#fff, #60a5fa);
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            background: linear-gradient(180deg, #ffffff 10%, #00e5ff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
+            text-shadow: 0 0 25px rgba(0, 229, 255, 0.6);
         }
 
         .header p {
-            margin: 5px 0 0;
-            color: #10b981;
+            margin: 4px 0 0;
+            font-size: 12px;
+            color: #00ffaa;
             font-weight: 600;
-            letter-spacing: 2px;
+            letter-spacing: 4px;
+            text-shadow: 0 0 8px rgba(0, 255, 170, 0.4);
         }
 
-        .glass-panel {
+        /* --- 科技感边框面板通用样式 (带切角与发光) --- */
+        .tech-panel {
             position: absolute;
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            color: white;
+            background: rgba(5, 18, 30, 0.85);
+            border: 1px solid rgba(0, 168, 255, 0.3);
+            box-shadow: 
+                0 0 30px rgba(0, 0, 0, 0.8),
+                inset 0 0 20px rgba(0, 168, 255, 0.1);
+            backdrop-filter: blur(12px);
             z-index: 10;
             padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box;
+            clip-path: polygon(
+                0 0, 
+                calc(100% - 15px) 0, 
+                100% 15px, 
+                100% 100%, 
+                15px 100%, 
+                0 calc(100% - 15px)
+            );
         }
 
+        .tech-panel::before,
+        .tech-panel::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-color: #00e5ff;
+            border-style: solid;
+            pointer-events: none;
+        }
+        .tech-panel::before {
+            top: 4px; left: 4px;
+            border-width: 2px 0 0 2px;
+        }
+        .tech-panel::after {
+            bottom: 4px; right: 4px;
+            border-width: 0 2px 2px 0;
+        }
+
+        .tech-panel h3 {
+            margin: 0 0 18px 0;
+            font-size: 15px;
+            color: #00e5ff;
+            font-weight: bold;
+            letter-spacing: 1px;
+            padding-left: 12px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+            padding-bottom: 8px;
+        }
+
+        .tech-panel h3::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 4px;
+            height: 14px;
+            background: #00ffaa;
+            box-shadow: 0 0 8px #00ffaa;
+        }
+
+        /* --- 左侧控制面板 --- */
         .control-panel {
-            top: 120px;
-            left: 30px;
-            width: 280px;
+            top: 110px;
+            left: 25px;
+            width: 300px;
         }
 
-        .control-panel h3,
-        .right-panel h3 {
-            margin: 0 0 15px 0;
-            font-size: 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            padding-bottom: 10px;
+        /* --- 自定义坐标输入框 --- */
+        .coord-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
         }
 
+        .coord-input {
+            flex: 1;
+            width: 0;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            color: #fff;
+            padding: 8px 10px;
+            font-size: 12px;
+            border-radius: 2px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .coord-input:focus {
+            border-color: #00ffaa;
+            box-shadow: 0 0 8px rgba(0, 255, 170, 0.4);
+        }
+
+        .btn-search-coord {
+            background: rgba(0, 229, 255, 0.15);
+            border: 1px solid #00e5ff;
+            color: #00e5ff;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: 0.3s;
+            white-space: nowrap;
+        }
+
+        .btn-search-coord:hover {
+            background: #00e5ff;
+            color: #000;
+            box-shadow: 0 0 10px #00e5ff;
+        }
+
+        /* 区域导航条块按钮 */
         .btn-region {
             width: 100%;
-            padding: 12px 15px;
-            margin-bottom: 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, rgba(0, 168, 255, 0.05) 0%, rgba(0, 168, 255, 0.15) 100%);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            color: #e0f4ff;
+            border-radius: 2px;
             cursor: pointer;
-            transition: 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             justify-content: space-between;
-            font-weight: bold;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-region::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0;
+            width: 2px; height: 100%;
+            background: #00e5ff;
+            transition: 0.3s;
         }
 
         .btn-region:hover {
-            background: rgba(59, 130, 246, 0.3);
-            border-color: #3b82f6;
-            transform: translateX(5px);
+            background: linear-gradient(90deg, rgba(0, 229, 255, 0.2) 0%, rgba(0, 229, 255, 0.4) 100%);
+            border-color: #00e5ff;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+            padding-left: 22px;
         }
 
+        .btn-region:hover::before {
+            width: 4px;
+            background: #00ffaa;
+            box-shadow: 0 0 10px #00ffaa;
+        }
+
+        /* 动作按钮 (暂停/返回) */
         .btn-action {
             width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-            background: rgba(16, 185, 129, 0.2);
-            border: 1px solid #10b981;
-            color: #10b981;
-            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            background: rgba(0, 255, 170, 0.1);
+            border: 1px solid #00ffaa;
+            color: #00ffaa;
+            border-radius: 2px;
             cursor: pointer;
+            font-size: 13px;
             font-weight: bold;
+            letter-spacing: 1px;
             transition: 0.3s;
+            box-shadow: inset 0 0 10px rgba(0, 255, 170, 0.05);
         }
 
         .btn-action:hover {
-            background: #10b981;
-            color: white;
+            background: #00ffaa;
+            color: #000;
+            box-shadow: 0 0 15px #00ffaa;
         }
 
+        /* 视图切换按钮组 */
         .view-toggle-group {
             display: flex;
-            gap: 8px;
-            margin-top: 10px;
+            gap: 10px;
+            margin-top: 15px;
         }
 
         .btn-toggle {
             flex: 1;
-            padding: 10px 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            border-radius: 8px;
+            padding: 10px 0;
+            background: rgba(0, 168, 255, 0.05);
+            border: 1px solid rgba(0, 168, 255, 0.3);
+            color: #a6d8ff;
+            border-radius: 2px;
             cursor: pointer;
             transition: 0.3s;
+            font-size: 13px;
             font-weight: bold;
+            text-align: center;
         }
 
         .btn-toggle:hover {
-            background: rgba(59, 130, 246, 0.25);
-            border-color: #3b82f6;
+            background: rgba(0, 229, 255, 0.15);
+            border-color: #00e5ff;
+            color: #fff;
         }
 
         .btn-toggle.active {
-            background: rgba(59, 130, 246, 0.35);
-            border-color: #60a5fa;
-            color: #dbeafe;
+            background: linear-gradient(180deg, rgba(0, 229, 255, 0.4), rgba(0, 168, 255, 0.2));
+            border-color: #00e5ff;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+            border-bottom: 2px solid #00ffaa;
         }
 
+        /* --- 右侧分析面板 --- */
         .right-panel {
-            top: 120px;
-            right: 30px;
-            bottom: 260px;
-            width: 320px;
+            top: 110px;
+            right: 25px;
+            bottom: 240px;
+            width: 340px;
             overflow-y: auto;
-        }
-
-        .narrative-panel {
-            position: absolute;
-            right: 30px;
-            bottom: 30px;
-            width: 360px;
-            padding: 18px 18px 16px;
-            border: 2px solid rgba(191, 219, 254, 0.52);
-            background:
-                linear-gradient(180deg, rgba(191, 219, 254, 0.24) 0%, rgba(125, 177, 252, 0.18) 16%, rgba(30, 41, 59, 0.82) 34%, rgba(15, 23, 42, 0.78) 100%);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.14),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-                0 14px 36px rgba(2, 6, 23, 0.34),
-                0 0 36px rgba(125, 177, 252, 0.22);
-            overflow: hidden;
-        }
-
-        .narrative-panel h3 {
-            position: relative;
-            z-index: 1;
-            margin: 0 0 12px;
-            font-size: 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-            padding-bottom: 10px;
-        }
-
-        .narrative-panel h3::before {
-            content: '区域解读';
-            font-size: 16px;
         }
 
         .right-panel > h3:nth-of-type(2) {
@@ -212,86 +336,79 @@
         }
 
         .stat-group {
-            margin-bottom: 20px;
-        }
-
-        .narrative-panel::before {
-            content: '';
-            position: absolute;
-            inset: -35% -55%;
-            background: linear-gradient(
-                105deg,
-                rgba(255, 255, 255, 0) 30%,
-                rgba(147, 197, 253, 0.08) 45%,
-                rgba(255, 255, 255, 0.18) 50%,
-                rgba(96, 165, 250, 0.10) 55%,
-                rgba(255, 255, 255, 0) 70%
-            );
-            transform: translateX(-32%) translateY(0) rotate(8deg);
-            animation: narrativeShimmer 8.5s ease-in-out infinite;
-            pointer-events: none;
-        }
-
-        .narrative-panel::after {
-            content: '';
-            position: absolute;
-            left: 14px;
-            right: 14px;
-            top: 0;
-            height: 2px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(219, 234, 254, 0.92), rgba(255, 255, 255, 0));
-            opacity: 0.95;
-            pointer-events: none;
-        }
-
-        .narrative-copy {
-            position: relative;
-            z-index: 1;
-            margin: 0;
-            font-size: 12.5px;
-            line-height: 1.8;
-            color: #f4f9ff;
-        }
-
-        @keyframes narrativeShimmer {
-            0% {
-                transform: translateX(-36%) translateY(-2%) rotate(8deg);
-                opacity: 0.18;
-            }
-            50% {
-                transform: translateX(18%) translateY(2%) rotate(8deg);
-                opacity: 0.42;
-            }
-            100% {
-                transform: translateX(54%) translateY(-1%) rotate(8deg);
-                opacity: 0.16;
-            }
+            margin-bottom: 25px;
         }
 
         .stat-item {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .stat-label {
             display: flex;
             justify-content: space-between;
             font-size: 12px;
-            margin-bottom: 4px;
-            color: #cbd5e1;
+            margin-bottom: 6px;
+            color: #b0e0ff;
+            font-weight: 600;
+        }
+
+        .stat-label span:last-child {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #fff;
+            font-size: 13px;
         }
 
         .progress-bg {
             width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
+            height: 10px;
+            background: rgba(2, 28, 45, 0.8);
+            border: 1px solid rgba(0, 168, 255, 0.2);
             border-radius: 3px;
-            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
         }
 
         .progress-bar {
             height: 100%;
-            transition: width 1s ease-in-out;
+            border-radius: 2px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 10px; height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 8px rgba(255,255,255,0.9);
+        }
+
+        .bar-c {
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.3) 0%, #00ffaa 100%);
+            box-shadow: 0 0 10px rgba(0, 255, 170, 0.5);
+        }
+        .label-c { color: #00ffaa !important; text-shadow: 0 0 5px rgba(0, 255, 170, 0.5); }
+
+        .bar-w {
+            background: linear-gradient(90deg, rgba(2, 132, 199, 0.3) 0%, #00e5ff 100%);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+        }
+        .label-w { color: #00e5ff !important; text-shadow: 0 0 5px rgba(0, 229, 255, 0.5); }
+
+        .bar-f {
+            background: linear-gradient(90deg, rgba(217, 119, 6, 0.3) 0%, #ffd000 100%);
+            box-shadow: 0 0 10px rgba(255, 208, 0, 0.5);
+        }
+        .label-f { color: #ffd000 !important; text-shadow: 0 0 5px rgba(255, 208, 0, 0.5); }
+
+        .bar-p {
+            background: linear-gradient(90deg, rgba(190, 18, 60, 0.3) 0%, #ff3366 100%);
+            box-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+        }
+        .label-p { color: #ff3366 !important; text-shadow: 0 0 5px rgba(255, 51, 102, 0.5); }
 
         .legend-item {
             display: flex;
@@ -300,21 +417,25 @@
             margin-bottom: 8px;
             font-size: 12px;
             cursor: pointer;
-            padding: 6px;
-            border-radius: 6px;
+            padding: 8px 10px;
+            background: rgba(0, 168, 255, 0.03);
+            border: 1px solid rgba(0, 229, 255, 0.1);
+            border-radius: 2px;
             transition: 0.2s;
         }
 
         .legend-item:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 229, 255, 0.1);
+            border-color: rgba(0, 229, 255, 0.4);
         }
 
         .color-box {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-            margin-right: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            margin-right: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
 
         .legend-left {
@@ -326,83 +447,136 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 8px;
-            margin-top: 12px;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(0, 229, 255, 0.2);
         }
 
         .legend-page-info {
             flex: 1;
             text-align: center;
             font-size: 12px;
-            color: #94a3b8;
+            color: #00e5ff;
+            font-family: monospace;
+            font-weight: bold;
         }
 
         .btn-page {
-            padding: 6px 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            border-radius: 8px;
+            padding: 6px 12px;
+            background: rgba(0, 168, 255, 0.1);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            color: #fff;
+            border-radius: 2px;
             cursor: pointer;
             transition: 0.3s;
-            font-weight: bold;
+            font-size: 12px;
         }
 
         .btn-page:hover:not(:disabled) {
-            background: rgba(59, 130, 246, 0.25);
-            border-color: #3b82f6;
+            background: #00e5ff;
+            color: #000;
+            box-shadow: 0 0 10px #00e5ff;
         }
 
         .btn-page:disabled {
-            opacity: 0.4;
+            opacity: 0.3;
+            border-color: rgba(255,255,255,0.1);
             cursor: default;
         }
 
+        /* --- 右下侧区域解读大文本框 --- */
+        .narrative-panel {
+            position: absolute;
+            right: 25px;
+            bottom: 25px;
+            width: 380px;
+            height: 190px;
+            overflow: hidden;
+            border-color: rgba(0, 255, 170, 0.4);
+            background: linear-gradient(180deg, rgba(5, 25, 35, 0.9) 0%, rgba(2, 10, 15, 0.95) 100%);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .narrative-panel h3 {
+            color: #00ffaa;
+            border-bottom-color: rgba(0, 255, 170, 0.2);
+        }
+        .narrative-panel h3::before {
+            background: #00e5ff;
+            box-shadow: 0 0 8px #00e5ff;
+        }
+
+        .narrative-copy {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.8;
+            color: #c4e8ff;
+            height: calc(100% - 35px);
+            overflow-y: auto;
+            padding-right: 5px;
+            text-align: justify;
+        }
+
+        /* 打字机光标特效保留 */
+        .narrative-copy::after {
+            content: '█';
+            animation: blinkCursor 1s infinite;
+            color: #00ffaa;
+            margin-left: 3px;
+            vertical-align: baseline;
+        }
+
+        @keyframes blinkCursor {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* --- 悬浮操作按钮与 Toast 提示 --- */
         .ui-toggle-floating {
             position: absolute;
-            top: 24px;
-            right: 30px;
+            top: 25px;
+            right: 25px;
             z-index: 25;
-            padding: 10px 14px;
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-            color: white;
+            padding: 8px 16px;
+            background: rgba(5, 18, 30, 0.8);
+            border: 1px solid #00e5ff;
+            color: #00e5ff;
+            border-radius: 2px;
             cursor: pointer;
+            font-size: 12px;
             font-weight: bold;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
             transition: 0.3s;
         }
 
         .ui-toggle-floating:hover {
-            background: rgba(59, 130, 246, 0.25);
-            border-color: #3b82f6;
+            background: #00e5ff;
+            color: #000;
+            box-shadow: 0 0 15px #00e5ff;
         }
 
         .toast {
             position: absolute;
             left: 50%;
-            bottom: 30px;
+            bottom: 40px;
             transform: translateX(-50%);
-            z-index: 20;
-            background: rgba(239, 68, 68, 0.94);
+            z-index: 30;
+            background: rgba(255, 0, 85, 0.9) !important;
+            border: 1px solid #ff0055;
             color: white;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            display: none;
-            max-width: 60vw;
-        }
-
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
+            padding: 12px 25px;
             border-radius: 2px;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.6);
+            display: none;
         }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.4); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00e5ff; }
     </style>
 </head>
 <body>
@@ -411,19 +585,27 @@
         <div id="map-container"></div>
 
         <button class="ui-toggle-floating" @click="toggleUi">
-            {{ showUi ? '隐藏 UI' : '显示 UI' }}
+            {{ showUi ? '🎛️ 隐藏UI' : '🎛️ 显示UI' }}
         </button>
 
         <div class="header" v-show="showUi">
-            <h1>EarthSeg</h1>
-            <p>基于 AlphaEarth 先验的全球双模态遥感语义分割分析平台</p>
+            <div class="header-title-box">
+                <h1>EarthSeg 全球遥感地物分析平台</h1>
+                <p>DUAL-MODAL SEMANTIC SEGMENTATION PLATFORM</p>
+            </div>
         </div>
 
-        <div class="glass-panel control-panel" v-show="showUi">
-            <h3>全球典型验证区域导航</h3>
-            <p style="font-size: 12px; color: #94a3b8; margin-bottom: 15px;">
-                点击以下区域，调用 16m 双模态模型进行面向场景的解译。
+        <div class="tech-panel control-panel" v-show="showUi">
+            <h3>重点展示区域导航</h3>
+            <p style="font-size: 12px; color: #72a2c4; margin-bottom: 15px; line-height: 1.5;">
+                锁定特定区域，加载 16m 细粒度智能解译结果
             </p>
+
+            <div class="coord-input-group">
+                <input type="text" class="coord-input" v-model="customLng" placeholder="经度 (-180~180)" />
+                <input type="text" class="coord-input" v-model="customLat" placeholder="纬度 (-90~90)" />
+                <button class="btn-search-coord" @click="flyToCustomCoord">定位</button>
+            </div>
 
             <button
                 class="btn-region"
@@ -432,15 +614,15 @@
                 @click="flyToRegion(region)"
             >
                 <span>{{ region.name }}</span>
-                <span style="color: #60a5fa; font-size: 12px;">探索</span>
+                <span style="color: #00ffaa; font-family: monospace;">[ 探索 ]</span>
             </button>
 
             <button class="btn-action" @click="toggleRotation">
-                {{ isRotating ? '暂停地球自转' : '恢复地球自转' }}
+                {{ isRotating ? '⏸️ 停止地球自转' : '▶️ 开始地球自转' }}
             </button>
 
-            <button v-if="isRegionMode" class="btn-action" @click="returnToGlobalView">
-                返回全球视角
+            <button v-if="isRegionMode" class="btn-action" style="border-color:#00e5ff; color:#00e5ff;" @click="returnToGlobalView">
+                🌐 返回全球视角
             </button>
 
             <div class="view-toggle-group">
@@ -461,54 +643,55 @@
             </div>
         </div>
 
-        <div class="glass-panel right-panel" v-show="showUi">
-            <h3>区域生态解译账本（当前: {{ currentRegionName }}）</h3>
+        <div class="tech-panel right-panel" v-show="showUi">
+            <h3>四维度生态评估指标</h3>
+            <div style="font-size:11px; color:#60a5fa; margin-bottom:12px; font-family:monospace;">
+                当前地区 // {{ currentRegionName }}
+            </div>
 
             <div class="stat-group">
                 <div class="stat-item">
                     <div class="stat-label">
-                        <span>C: 植被碳汇潜能指数</span>
-                        <span>{{ currentStats.c.toFixed(2) }}</span>
+                        <span>[C] 植被碳汇潜能</span>
+                        <span class="label-c">{{ currentStats.c.toFixed(2) }}</span>
                     </div>
                     <div class="progress-bg">
-                        <div class="progress-bar" style="background: #10b981;" :style="{ width: (currentStats.c * 100) + '%' }"></div>
+                        <div class="progress-bar bar-c" :style="{ width: (currentStats.c * 100) + '%' }"></div>
                     </div>
                 </div>
 
                 <div class="stat-item">
                     <div class="stat-label">
-                        <span>W: 水资源储备调蓄指数</span>
-                        <span>{{ currentStats.w.toFixed(2) }}</span>
+                        <span>[W] 水资源调蓄储备</span>
+                        <span class="label-w">{{ currentStats.w.toFixed(2) }}</span>
                     </div>
                     <div class="progress-bg">
-                        <div class="progress-bar" style="background: #3b82f6;" :style="{ width: (currentStats.w * 100) + '%' }"></div>
+                        <div class="progress-bar bar-w" :style="{ width: (currentStats.w * 100) + '%' }"></div>
                     </div>
                 </div>
 
                 <div class="stat-item">
                     <div class="stat-label">
-                        <span>F: 农业粮食产能指数</span>
-                        <span>{{ currentStats.f.toFixed(2) }}</span>
+                        <span>[F] 农业综合产能</span>
+                        <span class="label-f">{{ currentStats.f.toFixed(2) }}</span>
                     </div>
                     <div class="progress-bg">
-                        <div class="progress-bar" style="background: #f59e0b;" :style="{ width: (currentStats.f * 100) + '%' }"></div>
+                        <div class="progress-bar bar-f" :style="{ width: (currentStats.f * 100) + '%' }"></div>
                     </div>
                 </div>
 
                 <div class="stat-item">
                     <div class="stat-label">
-                        <span>P: 社会经济发展指数</span>
-                        <span>{{ currentStats.p.toFixed(2) }}</span>
+                        <span>[P] 人类活动与经济发展</span>
+                        <span class="label-p">{{ currentStats.p.toFixed(2) }}</span>
                     </div>
                     <div class="progress-bg">
-                        <div class="progress-bar" style="background: #ef4444;" :style="{ width: (currentStats.p * 100) + '%' }"></div>
+                        <div class="progress-bar bar-p" :style="{ width: (currentStats.p * 100) + '%' }"></div>
                     </div>
                 </div>
             </div>
 
-            <h3 style="margin-top: 22px;">区域解读</h3>
-
-            <h3 style="margin-top: 25px;">16m 细粒度调色盘图例</h3>
+            <h3 style="margin-top: 25px;">16m 分类特征图例</h3>
 
             <div
                 class="legend-item"
@@ -518,30 +701,30 @@
             >
                 <div class="legend-left">
                     <div class="color-box" :style="{ backgroundColor: `rgb(${item.rgb})`, opacity: item.visible ? 1 : 0.2 }"></div>
-                    <span :style="{ textDecoration: item.visible ? 'none' : 'line-through', color: item.visible ? '#fff' : '#64748b' }">
+                    <span :style="{ textDecoration: item.visible ? 'none' : 'line-through', color: item.visible ? '#fff' : '#477494' }">
                         {{ item.name }}
                     </span>
                 </div>
-                <span style="font-size: 11px; color: #94a3b8;">{{ item.id }}</span>
+                <span style="font-size: 11px; color: #00e5ff; font-family: monospace;">ID:{{ item.id }}</span>
             </div>
 
             <div class="legend-pager">
-                <button class="btn-page" @click="prevLegendPage" :disabled="legendPage === 0">上一页</button>
-                <div class="legend-page-info">{{ legendPage + 1 }} / {{ legendTotalPages }}</div>
-                <button class="btn-page" @click="nextLegendPage" :disabled="legendPage >= legendTotalPages - 1">下一页</button>
+                <button class="btn-page" @click="prevLegendPage" :disabled="legendPage === 0">◀ 上一页</button>
+                <div class="legend-page-info">页面 {{ legendPage + 1 }} / {{ legendTotalPages }}</div>
+                <button class="btn-page" @click="nextLegendPage" :disabled="legendPage >= legendTotalPages - 1">下一页 ▶</button>
             </div>
         </div>
 
-        <div class="glass-panel narrative-panel" v-show="showUi">
-            <h3>鍖哄煙瑙ｈ</h3>
-            <p class="narrative-copy">{{ currentNarrative }}</p>
+        <div class="tech-panel narrative-panel" v-show="showUi">
+            <h3>区域智能解读</h3>
+            <p class="narrative-copy">{{ displayedNarrative }}</p>
         </div>
 
         <div id="toast" class="toast"></div>
     </div>
 
     <script>
-        const { createApp, computed, ref, onMounted } = Vue;
+        const { createApp, computed, ref, onMounted, watch } = Vue;
 
         createApp({
             setup() {
@@ -557,7 +740,7 @@
                 let syncTimer = null;
                 let mapVisibleMaxLat = 85.05112878;
                 const globalRegionName = '全球概览';
-                const globalStats = { c: 0.50, w: 0.40, f: 0.50, p: 0.50 };
+                const globalStats = { c: 0.50, w: 0.50, f: 0.50, p: 0.50 };
                 const defaultGlobeViewControl = {
                     autoRotate: true,
                     autoRotateSpeed: 8,
@@ -626,6 +809,11 @@
                 const currentStats = ref({ ...globalStats });
                 let globeAssetsReady = false;
                 let globeUpgradeScheduled = false;
+
+                const customLng = ref('');
+                const customLat = ref('');
+
+                const csvDataMap = ref({});
 
                 const regions = ref([
                     {
@@ -742,9 +930,99 @@
                     '大洋洲（澳洲东海岸）': '该区域社会经济发展指数相对较高，农业产能处于中等水平，说明沿海开发和人类活动较为集中，同时仍保留一定生态支撑能力。整体适合强调沿海开发、人地协同与生态约束并存的复合格局。'
                 };
 
+                const formatLng = (lng) => {
+                    return Math.abs(lng).toFixed(2) + (lng >= 0 ? '°E' : '°W');
+                };
+
+                const formatLat = (lat) => {
+                    return Math.abs(lat).toFixed(2) + (lat >= 0 ? '°N' : '°S');
+                };
+
+                const generateCustomNarrative = (lng, lat, metrics) => {
+                    const { c, w, f, p } = metrics;
+
+                    const descC = c >= 0.7 ? "植被覆盖极为致密，碳汇潜能突出，具备极高的生态固碳与气候调节价值" :
+                                  c >= 0.4 ? "生态基底较为稳固，具备良好的植被生物量赋存与常态化碳汇功能" :
+                                             "自然植被碳汇潜能相对受限，生态系统的自我调节弹性弱于全球平均水位";
+
+                    const descW = w >= 0.7 ? "地表水文网络或湿地涵养空间充沛，水资源调蓄与战略储备优势极其显著" :
+                                  w >= 0.4 ? "区域水源涵养与供水潜能处于稳健水平，可有效支撑局部生态与生产用水" :
+                                             "淡水资源天然调蓄载体相对稀缺，呈现出一定程度的水源承载力约束特征";
+
+                    const descF = f >= 0.7 ? "农业耕作条件优越且集约化程度高，是保障区域乃至全球粮食供给的核心产能区" :
+                                  f >= 0.4 ? "保有稳定的农牧业生产基底，具备相当的综合农业产出与土地开发潜能" :
+                                             "土壤适宜度或农耕开发强度有限，属于非典型主粮核心产区";
+
+                    const descP = p >= 0.7 ? "人类活动深度交织，社会经济与城镇建设动能强劲，属典型的人工地物与高密度交互主导区。" :
+                                  p >= 0.4 ? "存在适度的人类居住或资源利用痕迹，人地关系处于复合交融状态。" :
+                                             "人类活动干扰度极低，整体保留了更为纯粹的自然演替风貌与原始荒野肌理。";
+
+                    let summary = "";
+                    if (c >= 0.6 && p < 0.4) {
+                        summary = "综合研判：该区域属于典型的【自然生态保护主导区】，宜着重筑牢生态安全屏障，发挥其极佳的全球环境调节效益。";
+                    } else if (f >= 0.6 || p >= 0.6) {
+                        summary = "综合研判：该区域开发利用动能较强，人地关系紧密，需重点关注高强度经济产出与资源承载红线之间的协同平衡。";
+                    } else {
+                        summary = "综合研判：该区域各项维度的本底指标较为均衡，呈现出多元复合的地理生态特征与适度弹性空间。";
+                    }
+
+                    return `当前锁定了用户自定义输入坐标位置：经度 ${formatLng(lng)}，纬度 ${formatLat(lat)}。基于多模态遥感语义分割数据深度推演，该区域呈现以下特征：\n\n生态本底侧，${descC}；水文维度上，${descW}；产业供给面，${descF}；社会属性上，${descP}\n\n${summary}`;
+                };
+
                 const currentNarrative = computed(() => {
+                    if (currentRegionName.value.startsWith('自定义坐标')) {
+                        const lng = parseFloat(customLng.value);
+                        const lat = parseFloat(customLat.value);
+                        if (isNaN(lng) || isNaN(lat)) return '';
+                        const key = `${lng},${lat}`;
+                        const metrics = csvDataMap.value[key];
+                        if (metrics) {
+                            return generateCustomNarrative(lng, lat, metrics);
+                        } else {
+                            return `当前锁定了用户自定义输入坐标位置：经度 ${formatLng(lng)}，纬度 ${formatLat(lat)}。`;
+                        }
+                    }
                     return regionNarratives[currentRegionName.value] || regionNarratives[globalRegionName];
                 });
+
+                const displayedNarrative = ref('');
+                let typewriterTimer = null;
+                let delayTimeout = null;
+
+                const startTypewriterEffect = (fullText) => {
+                    if (typewriterTimer) {
+                        clearInterval(typewriterTimer);
+                        typewriterTimer = null;
+                    }
+                    if (delayTimeout) {
+                        clearTimeout(delayTimeout);
+                        delayTimeout = null;
+                    }
+
+                    displayedNarrative.value = '[ 模型推理中... ]\n';
+                    
+                    delayTimeout = setTimeout(() => {
+                        displayedNarrative.value = '';
+                        let charIndex = 0;
+                        typewriterTimer = setInterval(() => {
+                            if (charIndex < fullText.length) {
+                                displayedNarrative.value += fullText.charAt(charIndex);
+                                charIndex++;
+                                const scrollPanel = document.querySelector('.narrative-copy');
+                                if (scrollPanel) scrollPanel.scrollTop = scrollPanel.scrollHeight;
+                            } else {
+                                clearInterval(typewriterTimer);
+                                typewriterTimer = null;
+                            }
+                        }, 25);
+                    }, 2000);
+                };
+
+                watch(currentNarrative, (newText) => {
+                    if (newText) {
+                        startTypewriterEffect(newText);
+                    }
+                }, { immediate: true });
 
                 const showToast = (msg) => {
                     const toast = document.getElementById('toast');
@@ -1159,7 +1437,7 @@
                     myChart = echarts.init(chartDom);
 
                     myChart.setOption({
-                        backgroundColor: '#000000',
+                        backgroundColor: '#020913',
                         globe: {
                             baseTexture: currentBaseTexture.value,
                             heightTexture: currentHeightTexture.value || undefined,
@@ -1321,6 +1599,33 @@
                     }
                 };
 
+                const flyToCustomCoord = () => {
+                    const lng = parseFloat(customLng.value);
+                    const lat = parseFloat(customLat.value);
+
+                    if (isNaN(lng) || isNaN(lat) || lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+                        showToast('请输入有效的经纬度数值 (-180~180, -90~90)');
+                        return;
+                    }
+
+                    const key = `${lng},${lat}`;
+                    const metrics = csvDataMap.value[key];
+
+                    const customObj = {
+                        name: `自定义坐标 (${lng.toFixed(2)}, ${lat.toFixed(2)})`,
+                        lng: lng,
+                        lat: lat,
+                        distance: 42,
+                        globeDistance: 35,
+                        mapZoom: 6.8,
+                        previewImage: null,
+                        previewBounds: null,
+                        stats: metrics ? { ...metrics } : { ...currentStats.value }
+                    };
+
+                    flyToRegion(customObj);
+                };
+
                 const flyToRegion = (region) => {
                     isRegionMode.value = true;
                     activeRegionConfig.value = region;
@@ -1380,8 +1685,31 @@
                     applyViewMode();
                 };
 
+                const loadCsvData = async () => {
+                    try {
+                        const response = await fetch('./Global_Intersections_4D_Normalized.csv');
+                        const text = await response.text();
+                        const lines = text.trim().split('\n');
+                        const map = {};
+                        for (let i = 1; i < lines.length; i++) {
+                            const cols = lines[i].split(',');
+                            const lng = parseFloat(cols[0]);
+                            const lat = parseFloat(cols[1]);
+                            const c = parseFloat(cols[2]);
+                            const w = parseFloat(cols[3]);
+                            const f = parseFloat(cols[4]);
+                            const p = parseFloat(cols[5]);
+                            map[`${lng},${lat}`] = { c, w, f, p };
+                        }
+                        csvDataMap.value = map;
+                    } catch (e) {
+                        console.warn('CSV 数据加载失败，自定义坐标解读将仅显示位置。', e);
+                    }
+                };
+
                 onMounted(() => {
                     initEarth();
+                    loadCsvData();
                 });
 
                 return {
@@ -1389,6 +1717,10 @@
                     currentRegionName,
                     currentNarrative,
                     currentStats,
+                    customLng,
+                    customLat,
+                    displayedNarrative,
+                    flyToCustomCoord,
                     flyToRegion,
                     isRotating,
                     isRegionMode,
